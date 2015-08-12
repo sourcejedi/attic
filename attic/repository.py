@@ -593,13 +593,14 @@ class FsyncWorker(object):
        Any exceptions (from os.fsync() or fd.close()) will be re-raised
        on the next call into FsyncWorker.  (Naturally this applies to
        the .flush() and .close() methods as well as .fsync_and_close_fd()).
+
+       Note close() MUST be called in all cases, including exceptions.
     """
 
     def __init__(self):
         self.channel = Channel()
         self.exception = None
         thread = threading.Thread(target=self._run)
-        thread.daemon = True
         thread.start()
 
     def _run(self):
@@ -638,10 +639,16 @@ class FsyncWorker(object):
             raise e
 
     def close(self):
+        """Shut down the background thread (after calling flush())
+
+           You MUST shut down the thread.  Otherwise, the python
+           process will stay running when the main thread has
+           finished.
+        """
         try:
             self.flush()
         finally:
-            self.channel.put(None)  # tell thread to shutdown
+            self.channel.put(None)
 
 class Channel(object):
     """A blocking channel, like in CSP or Go.
